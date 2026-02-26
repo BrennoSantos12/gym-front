@@ -24,6 +24,36 @@ const routes: RouteRecordRaw[] = [
     name: 'register',
     component: () => import('@/views/RegisterView.vue'),
   },
+  {
+    path: '/training_plan',
+    name: 'training_plan',
+    component: () => import('@/views/FichaView.vue'),
+  },
+  {
+    path: '/create_training_plan',
+    name: 'create_training_plan',
+    component: () => import('@/views/TrainingPlanView.vue')
+  },
+  {
+    path: '/edit_training_plan/:id',
+    name: 'edit_training_plan',
+    component: () => import('@/views/EditTrainingPlanView.vue'),
+  },
+  {
+    path: '/edit_training_session/:id',
+    name: 'edit_training_session',
+    component: () => import('@/views/EditTrainingSessionView.vue'),
+  },
+  {
+    path: '/create_training_session/:id',
+    name: '/create_training_session',
+    component: () => import('@/views/TrainingSessionView.vue')
+  },
+  {
+    path: '/report',
+    name: '/report',
+    component: () => import('@/views/ReportView.vue')
+  }
 ]
 
 const router = createRouter({
