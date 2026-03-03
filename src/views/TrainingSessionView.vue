@@ -3,7 +3,7 @@ import { useRoute } from 'vue-router'
 import { useTrainingPlanStore } from '@/stores/training_plan'
 import { useTrainingSessionStore } from '@/stores/training_session'
 import { useAuthStore } from '@/stores/auth'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import z from 'zod'
 import router from '@/router'
 
@@ -38,6 +38,48 @@ const loading = ref(false)
 const showConfirm = ref(false)
 const emptyExercises = ref<string[]>([])
 
+const TIMER_DURATION = 120
+const timerSeconds = ref(TIMER_DURATION)
+const timerRunning = ref(false)
+let timerInterval: ReturnType<typeof setInterval> | null = null
+
+const timerDisplay = computed(() => {
+  const m = Math.floor(timerSeconds.value / 60)
+  const s = timerSeconds.value % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+})
+
+function toggleTimer() {
+  if (timerRunning.value) {
+    clearInterval(timerInterval!)
+    timerInterval = null
+    timerRunning.value = false
+  } else {
+    if (timerSeconds.value === 0) timerSeconds.value = TIMER_DURATION
+    timerRunning.value = true
+    timerInterval = setInterval(() => {
+      timerSeconds.value--
+      if (timerSeconds.value <= 0) {
+        timerSeconds.value = 0
+        clearInterval(timerInterval!)
+        timerInterval = null
+        timerRunning.value = false
+      }
+    }, 1000)
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval!)
+  timerInterval = null
+  timerRunning.value = false
+  timerSeconds.value = TIMER_DURATION
+}
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+})
+
 const currentExercise = computed(() => exercises.value[currentIndex.value])
 const currentSeries = computed(() => seriesByExercise.value[currentIndex.value] ?? [])
 const canSubmit = computed(() => seriesByExercise.value.some(s => s.length > 0))
@@ -69,6 +111,8 @@ function addSerie() {
   newReps.value = ''
   newWeight.value = ''
 }
+
+
 
 function removeSerie(idx: number) {
   seriesByExercise.value[currentIndex.value] = seriesByExercise.value[currentIndex.value].filter(
@@ -180,6 +224,8 @@ async function submit() {
         </p>
       </div>
 
+      <!-- Timer de descanso -->
+
       <!-- Inputs para adicionar série -->
       <div class="flex gap-3 items-end w-full">
         <div class="flex flex-col gap-1 flex-1">
@@ -215,6 +261,27 @@ async function submit() {
         </button>
       </div>
 
+      <div class="w-full flex items-center justify-between bg-gray-900 rounded-xl px-4 py-3">
+        <div class="flex flex-col">
+          <span class="text-xs text-gray-500 mb-0.5">Descanso</span>
+          <span class="text-3xl font-mono font-bold tracking-widest"
+            :class="timerSeconds <= 10 && timerSeconds > 0 ? 'text-red-400' : timerSeconds === 0 ? 'text-gray-600' : 'text-white'">{{
+            timerDisplay }}</span>
+        </div>
+        <div class="flex gap-2">
+          <button @click="toggleTimer" type="button"
+            class="px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            :class="timerRunning ? 'bg-yellow-600 hover:bg-yellow-500' : 'bg-green-700 hover:bg-green-600'">
+            {{ timerRunning ? 'Pausar' : timerSeconds === TIMER_DURATION ? 'Iniciar' : timerSeconds === 0 ? 'Reiniciar'
+              : 'Continuar' }}
+          </button>
+          <button v-if="timerSeconds !== TIMER_DURATION" @click="resetTimer" type="button"
+            class="px-3 py-2 rounded-lg text-sm bg-gray-700 hover:bg-gray-600 transition-colors">
+            ↺
+          </button>
+        </div>
+      </div>
+
       <!-- Finalizar treino -->
       <button @click="requestSubmit" :disabled="!canSubmit || loading" type="button"
         class="w-full py-3 rounded-xl font-semibold text-lg mt-2 transition-colors" :class="canSubmit && !loading
@@ -229,10 +296,7 @@ async function submit() {
 
   <!-- Modal de confirmação -->
   <Teleport to="body">
-    <div
-      v-if="showConfirm"
-      class="fixed inset-0 bg-black/80 flex items-end justify-center z-50 px-4 pb-8"
-    >
+    <div v-if="showConfirm" class="fixed inset-0 bg-black/80 flex items-end justify-center z-50 px-4 pb-8">
       <div class="bg-gray-900 rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
         <div class="text-center">
           <p class="text-lg font-semibold">Concluir treino?</p>
@@ -240,26 +304,17 @@ async function submit() {
 
         <div v-if="emptyExercises.length" class="bg-gray-800 rounded-xl px-4 py-3 flex flex-col gap-1">
           <p class="text-sm text-orange-400 font-medium mb-1">Exercícios sem registro:</p>
-          <p
-            v-for="name in emptyExercises"
-            :key="name"
-            class="text-sm text-gray-300"
-          >
+          <p v-for="name in emptyExercises" :key="name" class="text-sm text-gray-300">
             · {{ name }}
           </p>
         </div>
 
         <div class="flex flex-col gap-2">
-          <button
-            @click="submit"
-            class="w-full py-3 rounded-xl bg-green-700 font-semibold text-sm active:bg-green-600"
-          >
+          <button @click="submit" class="w-full py-3 rounded-xl bg-green-700 font-semibold text-sm active:bg-green-600">
             Concluir assim mesmo
           </button>
-          <button
-            @click="showConfirm = false"
-            class="w-full py-3 rounded-xl bg-gray-800 font-semibold text-sm text-gray-300"
-          >
+          <button @click="showConfirm = false"
+            class="w-full py-3 rounded-xl bg-gray-800 font-semibold text-sm text-gray-300">
             Cancelar
           </button>
         </div>
